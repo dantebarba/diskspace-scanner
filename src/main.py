@@ -4,20 +4,27 @@ import re
 import logging
 import ast
 import psutil
+import sys
 
 # bytes pretty-printing
 UNITS_MAPPING = [
-    (1 << 50, ' PB'),
-    (1 << 40, ' TB'),
-    (1 << 30, ' GB'),
-    (1 << 20, ' MB'),
-    (1 << 10, ' KB'),
-    (1, (' byte', ' bytes')),
+    (1 << 50, 'P'),
+    (1 << 40, 'T'),
+    (1 << 30, 'G'),
+    (1 << 20, 'M'),
+    (1 << 10, 'K'),
+    (1, ('B', ' bytes')),
 ]
 
 
 def configure(log_level='INFO'):
-    logging.basicConfig(level=eval("logging."+log_level), format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+    root = logging.getLogger()
+    root.setLevel(eval("logging."+log_level))
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(eval("logging."+log_level))
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
 
 def check_disk_usage(directory):
     ''' checks the disk usage '''
@@ -44,12 +51,14 @@ def get_file_list(dirName='.'):
                 
     return allFiles
 
+def calc_demanded_space(free_bytes, free, threshold):
+    return free + threshold - free_bytes
 
 @click.command()
 @click.option("--directories", help="Directories to scan", required=True)
-@click.option("--free", default="10 GB", help="Minimum free space. Accepts huamn readable format e.g 10MB, 10GB, 1TB", required=True)
-@click.option("--threshold", default="20 GB", help="Minimum space to be freed")
-@click.option("--log_level", default="20 GB", help="Log Level: DEBUG, INFO, WARNING, ERROR")
+@click.option("--free", default="10G", help="Minimum free space to trigger cleanup. Accepts huamn readable format e.g 10M, 10G, 1T", required=True)
+@click.option("--threshold", default="20G", help="Minimum space to be freed")
+@click.option("--log_level", default="INFO", help="Log Level: DEBUG, INFO, WARNING, ERROR")
 def disk_space_calc(directories, free, threshold, log_level):
     """ Check free disk space and 
     return a list of files 
@@ -59,16 +68,23 @@ def disk_space_calc(directories, free, threshold, log_level):
     """
     configure(log_level)
 
-
     if (directories is None):
         logging.debug("Directory is empty, skipping")
         return False
     
+    logging.debug("Starting directory clean --- Filesystem check")
+    logging.debug("Free space is set at: %s", free)
+    logging.debug("Threshold is set at: %s", threshold)
+
     free_bytes = check_disk_usage(".")
+
+    logging.debug("Free space available is: %s", byte_to_human_read(free_bytes))
 
     if (free_bytes > human_read_to_byte(free)):
         logging.debug("There is enugh free space: " + byte_to_human_read(free_bytes))
         return False
+
+    logging.debug("Reading directories: %s", str(directories))
 
     files = []
     for directory in ast.literal_eval(directories):
@@ -80,13 +96,24 @@ def disk_space_calc(directories, free, threshold, log_level):
 
     files_to_clean = []
 
+    logging.debug("Collecting files from available set: %s", str(files))
+
+    free_space_needed = calc_demanded_space(free_bytes, human_read_to_byte(free), human_read_to_byte(threshold))
+
+    logging.debug("Space that needs to be freed: %s", byte_to_human_read(free_space_needed))
+
     for file in sorted(files, key=os.path.getmtime):
-        if (byte_sum > human_read_to_byte(threshold)):
+
+        if (byte_sum >= free_space_needed):
+            logging.debug("Files collected: %s", str(files_to_clean))
             return files_to_clean
+        
         byte_sum += os.path.getsize(file)
         files_to_clean.append(file)
 
     logging.debug("Files collected: %s", str(files_to_clean))
+
+    logging.warning("Not enough files can be collected to reach threshold. Total collected %s. Required %s", byte_to_human_read(byte_sum), byte_to_human_read(free_space_needed))
 
     return files_to_clean
 
@@ -109,9 +136,8 @@ def byte_to_human_read(bytes, units=UNITS_MAPPING):
 
 
 def human_read_to_byte(size):
-    size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
-    size = size.split()                # divide '1 GB' into ['1', 'GB']
-    num, unit = int(size[0]), size[1]
+    size_name = ("B", "K", "M", "G", "T", "P", "E", "Z", "Y")
+    num, unit = int(size[0:-1]), size[-1]
     # index in list of sizes determines power to raise it to
     idx = size_name.index(unit)
     # ** is the "exponent" operator - you can use it instead of math.pow()
@@ -120,5 +146,4 @@ def human_read_to_byte(size):
 
 
 if __name__ == '__main__':
-    configure()
     disk_space_calc()

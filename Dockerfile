@@ -7,12 +7,10 @@ COPY requirements.txt requirements.txt
 RUN pip3 install -r requirements.txt
 
 ENV SCAN_DIRS "['/scan']"
-ENV FREE "10 GB"
-ENV THRESHOLD "15 GB"
+ENV FREE "10G"
+ENV THRESHOLD "15G"
 ENV LOG_LEVEL "INFO"
 
 ADD . .
 
-ENTRYPOINT [ "python3", "src/main.py" ]
-
-CMD --directories ${SCAN_DIRS} --free ${FREE} --threshold ${THRESHOLD}", "--log_level ${LOG_LEVEL}
+CMD python3 src/main.py --directories $SCAN_DIRS --free $FREE --threshold $THRESHOLD --log_level $LOG_LEVEL

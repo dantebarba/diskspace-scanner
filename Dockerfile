@@ -15,4 +15,4 @@ ADD . .
 
 ENTRYPOINT [ "python3", "src/main.py" ]
 
-CMD ["--directory ${SCAN_DIRS}", "--free ${FREE}", "--threshold ${THRESHOLD}", "--log_level ${LOG_LEVEL}"]
+CMD ["--directories ${SCAN_DIRS}", "--free ${FREE}", "--threshold ${THRESHOLD}", "--log_level ${LOG_LEVEL}"]

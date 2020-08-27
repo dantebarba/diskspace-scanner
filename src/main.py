@@ -121,12 +121,12 @@ def disk_space_calc(directories, free, threshold, log_level, remote_path_mapping
     """
     configure(log_level)
 
-    if (scheduled is None):
+    if not scheduled:
         logging.debug("One time execution is enabled.")
         do_calculation_and_move(directories, free, threshold, remote_path_mapping,
                                 rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run)
 
-    if (scheduled):
+    if scheduled:
         logging.debug("Scheduler is enabled. Task will be scheduled to run at %s", scheduled)
         scheduler.configure(scheduled, lambda:         do_calculation_and_move(directories, free, threshold, remote_path_mapping,
                                                                                rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run))

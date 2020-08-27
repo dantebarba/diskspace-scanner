@@ -17,7 +17,8 @@ ENV RCLONE_URL http://localhost:5572
 ENV SOURCE_REMOTE '/'
 ENV DEST_REMOTE '/'
 ENV REMOTE_PATH_MAPPING "{}"
+ENV SCHEDULED ''
 
 ADD . .
 
-CMD python3 src/main.py --directories "$SCAN_DIRS" --free $FREE --threshold $THRESHOLD --log_level $LOG_LEVEL --rclone_url $RCLONE_URL --auth_user $AUTH_USER --auth_password $AUTH_PASSWORD --dry_run $DRY_RUN --source_remote $SOURCE_REMOTE --dest_remote $DEST_REMOTE --remote_path_mapping "$REMOTE_PATH_MAPPING"
+CMD python3 src/main.py --directories "$SCAN_DIRS" --free $FREE --threshold $THRESHOLD --log_level $LOG_LEVEL --rclone_url $RCLONE_URL --auth_user $AUTH_USER --auth_password $AUTH_PASSWORD --dry_run $DRY_RUN --source_remote $SOURCE_REMOTE --dest_remote $DEST_REMOTE --remote_path_mapping "$REMOTE_PATH_MAPPING" --scheduled "$SCHEDULED"

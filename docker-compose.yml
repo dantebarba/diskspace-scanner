@@ -1,0 +1,10 @@
+version: '3.4'
+
+services:
+  diskspacescanner:
+    image: dantebarba/diskspacescanner:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_VERSION: ${BUILD_VERSION}

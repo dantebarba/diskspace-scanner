@@ -18,6 +18,7 @@ ENV SOURCE_REMOTE '/'
 ENV DEST_REMOTE '/'
 ENV REMOTE_PATH_MAPPING "{}"
 ENV SCHEDULED ''
+ENV TZ 'America/Argentina/Buenos_Aires'
 
 ADD . .
 

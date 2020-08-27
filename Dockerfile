@@ -6,6 +6,9 @@ COPY requirements.txt requirements.txt
 
 RUN pip3 install -r requirements.txt
 
+ARG BUILD_VERSION=''
+
+ENV BUILD_VERSION ${BUILD_VERSION}
 ENV SCAN_DIRS "['/scan']"
 ENV FREE "10G"
 ENV THRESHOLD "15G"

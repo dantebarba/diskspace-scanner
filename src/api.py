@@ -15,7 +15,7 @@ def rclone_options_config(remote_url, auth, dry_run):
     logging.debug("""Execute parameters: 
     url: %s
     auth: %s""",
-    remote_url, auth.decode("utf-8"))
+    remote_url, "SECRET")
 
     options = {
         "main" : {
@@ -38,7 +38,7 @@ def execute_command(remote_url, command='movefile', srcFs='/', srcRemote='', dst
     dstFs: %s
     dstRemote: %s
     auth: %s
-    """, remote_url, command, srcFs, srcRemote, dstFs, dstRemote, auth)
+    """, remote_url, command, srcFs, srcRemote, dstFs, dstRemote, "SECRET")
 
     if (remote_url is None or command is None or srcFs is None or srcRemote is None or dstFs is None or dstRemote is None):
         logging.error("Configuration error: Parameters are null")

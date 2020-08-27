@@ -1,10 +1,13 @@
-import click
+import ast
+import logging
 import os
 import re
-import logging
-import ast
-import psutil
 import sys
+
+import click
+import psutil
+import requests
+
 import api
 import scheduler
 
@@ -28,6 +31,9 @@ def configure(log_level='INFO'):
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     root.addHandler(handler)
+
+    if "BUILD_VERSION" in os.environ.keys():
+        logging.debug("DISK SCANNER BUILD %s", os.environ["BUILD_VERSION"])
 
 
 def set_cron_lock():
@@ -99,6 +105,26 @@ def collect_files_to_clean(files, free_space_needed):
     return files_to_clean
 
 
+def do_healthcheck(task, healthcheck_url):
+    requests.get(healthcheck_url + "/start")
+
+    try:
+        task()
+    except:
+        requests.get(healthcheck_url + "/fail")
+        raise
+
+    requests.get(healthcheck_url)
+
+
+def wrap_with_healthcheck(task, healthcheck_url):
+    if healthcheck_url:
+        logging.debug("Healthcheck url is %s", healthcheck_url)
+        return lambda: do_healthcheck(task, healthcheck_url)
+    if not healthcheck_url:
+        return task
+
+
 @click.command()
 @click.option("--directories", help="Directories to scan", required=True)
 @click.option("--free", default="10G", help="Minimum free space to trigger cleanup. Accepts huamn readable format e.g 10M, 10G, 1T", required=True)
@@ -112,7 +138,8 @@ def collect_files_to_clean(files, free_space_needed):
 @click.option("--auth_password", default="", help="Auth password")
 @click.option("--dry_run", default='True', help="Dry Run")
 @click.option("--scheduled", default=None, help="Enable scheduled execution. Parameter should be a crontab expression")
-def disk_space_calc(directories, free, threshold, log_level, remote_path_mapping, rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run, scheduled):
+@click.option("--healthcheck", default='', help="Healthcheck url")
+def disk_space_calc(directories, free, threshold, log_level, remote_path_mapping, rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run, scheduled, healthcheck):
     """ Check free disk space and 
     return a list of files 
     to be moved/deleted from 
@@ -127,9 +154,10 @@ def disk_space_calc(directories, free, threshold, log_level, remote_path_mapping
                                 rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run)
 
     if scheduled:
-        logging.debug("Scheduler is enabled. Task will be scheduled to run at %s", scheduled)
-        scheduler.configure(scheduled, lambda:         do_calculation_and_move(directories, free, threshold, remote_path_mapping,
-                                                                               rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run))
+        logging.debug(
+            "Scheduler is enabled. Task will be scheduled to run at %s", scheduled)
+        scheduler.configure(scheduled, wrap_with_healthcheck(lambda:         do_calculation_and_move(directories, free, threshold, remote_path_mapping,
+                                                                                                     rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run), healthcheck))
         scheduler.start()
 
 

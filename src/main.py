@@ -6,6 +6,7 @@ import ast
 import psutil
 import sys
 import api
+import scheduler
 
 # bytes pretty-printing
 UNITS_MAPPING = [
@@ -110,7 +111,8 @@ def collect_files_to_clean(files, free_space_needed):
 @click.option("--auth_user", default="", help="Auth username")
 @click.option("--auth_password", default="", help="Auth password")
 @click.option("--dry_run", default='True', help="Dry Run")
-def disk_space_calc(directories, free, threshold, log_level, remote_path_mapping, rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run):
+@click.option("--scheduled", default=None, help="Enable scheduled execution. Parameter should be a crontab expression")
+def disk_space_calc(directories, free, threshold, log_level, remote_path_mapping, rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run, scheduled):
     """ Check free disk space and 
     return a list of files 
     to be moved/deleted from 
@@ -119,6 +121,19 @@ def disk_space_calc(directories, free, threshold, log_level, remote_path_mapping
     """
     configure(log_level)
 
+    if (scheduled is None):
+        logging.debug("One time execution is enabled.")
+        do_calculation_and_move(directories, free, threshold, remote_path_mapping,
+                                rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run)
+
+    if (scheduled):
+        logging.debug("Scheduler is enabled. Task will be scheduled to run at %s", scheduled)
+        scheduler.configure(scheduled, lambda:         do_calculation_and_move(directories, free, threshold, remote_path_mapping,
+                                                                               rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run))
+        scheduler.start()
+
+
+def do_calculation_and_move(directories, free, threshold, remote_path_mapping, rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run):
     if (directories is None):
         logging.debug("Directory is empty, skipping")
         return False

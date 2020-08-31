@@ -21,19 +21,23 @@ UNITS_MAPPING = [
     (1, ('B', ' bytes')),
 ]
 
-
-def configure(log_level='INFO'):
+def configure(log_level='INFO', log_file=''):
     root = logging.getLogger()
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(name)s - %(message)s')
     root.setLevel(eval("logging."+log_level))
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(eval("logging."+log_level))
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
     handler.setFormatter(formatter)
     root.addHandler(handler)
 
-    if "BUILD_VERSION" in os.environ.keys():
-        logging.debug("DISK SCANNER BUILD %s", os.environ["BUILD_VERSION"])
+    if log_file:
+        fh = logging.FileHandler(log_file)
+        fh.setLevel(eval("logging."+log_level))
+        fh.setFormatter(formatter)
+        root.addHandler(fh)
+        os.environ["LOG_FILE"] = log_file
 
 
 def check_disk_usage(directory):
@@ -96,15 +100,16 @@ def collect_files_to_clean(files, free_space_needed):
 
 
 def do_healthcheck(task, healthcheck_url):
+
     requests.get(healthcheck_url + "/start")
 
     try:
-        debug_report = task()
+        task()
     except:
-        requests.post(healthcheck_url + "/fail", data=str(debug_report))
+        requests.post(healthcheck_url + "/fail", data=read_last_log_lines(os.environ["LOG_FILE"]))
         raise
 
-    requests.post(healthcheck_url, data=str(debug_report))
+    requests.post(healthcheck_url, data=read_last_log_lines(os.environ["LOG_FILE"]))
 
 
 def wrap_with_healthcheck(task, healthcheck_url):
@@ -129,14 +134,18 @@ def wrap_with_healthcheck(task, healthcheck_url):
 @click.option("--dry_run", default='True', help="Dry Run")
 @click.option("--scheduled", default=None, help="Enable scheduled execution. Parameter should be a crontab expression")
 @click.option("--healthcheck", default='', help="Healthcheck url")
-def disk_space_calc(directories, free, threshold, log_level, remote_path_mapping, rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run, scheduled, healthcheck):
+@click.option("--logfile", default='', help="logfile location")
+def disk_space_calc(directories, free, threshold, log_level, remote_path_mapping, rclone_url, source_remote, dest_remote, auth_user, auth_password, dry_run, scheduled, healthcheck, logfile):
     """ Check free disk space and 
     return a list of files 
     to be moved/deleted from 
     disk to reach a desired 
     threshold of free space. 
     """
-    configure(log_level)
+    configure(log_level, logfile)
+
+    if "BUILD_VERSION" in os.environ.keys():
+        logging.info("DISK SCANNER BUILD %s", os.environ["BUILD_VERSION"])
 
     if not scheduled:
         logging.debug("One time execution is enabled.")
@@ -233,6 +242,11 @@ def human_read_to_byte(size):
     factor = 1024 ** idx
     return num * factor
 
+
+def read_last_log_lines(log_file):
+    with open(log_file, 'rb') as file:
+        file.seek(-1024 * 2, os.SEEK_END)
+        return repr(file.read())
 
 if __name__ == '__main__':
     disk_space_calc()

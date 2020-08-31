@@ -36,16 +36,6 @@ def configure(log_level='INFO'):
         logging.debug("DISK SCANNER BUILD %s", os.environ["BUILD_VERSION"])
 
 
-def set_cron_lock():
-    ''' sets a lock to prevent more executions while doing a calculation '''
-    pass
-
-
-def release_cron_lock():
-    ''' release the cron lock '''
-    pass
-
-
 def check_disk_usage(directory):
     ''' checks the disk usage '''
     hdd = psutil.disk_usage(directory)
@@ -109,12 +99,12 @@ def do_healthcheck(task, healthcheck_url):
     requests.get(healthcheck_url + "/start")
 
     try:
-        task()
+        debug_report = task()
     except:
-        requests.get(healthcheck_url + "/fail")
+        requests.post(healthcheck_url + "/fail", data=str(debug_report))
         raise
 
-    requests.get(healthcheck_url)
+    requests.post(healthcheck_url, data=str(debug_report))
 
 
 def wrap_with_healthcheck(task, healthcheck_url):
@@ -166,39 +156,55 @@ def do_calculation_and_move(directories, free, threshold, remote_path_mapping, r
         logging.debug("Directory is empty, skipping")
         return False
 
+    debug_report = {}
+
     logging.debug("Starting directory clean --- Filesystem check")
     logging.debug("Free space is set at: %s", free)
     logging.debug("Threshold is set at: %s", threshold)
 
+    debug_report["free_param"] = free
+    debug_report["threshold_param"] = threshold
+
     free_bytes = check_disk_usage(".")
 
+    debug_report["free_bytes"] = byte_to_human_read(free_bytes)
+
     logging.debug("Free space available is: %s",
-                  byte_to_human_read(free_bytes))
+                  debug_report["free_bytes"])
 
     if (free_bytes > human_read_to_byte(free)):
         logging.debug("There is enugh free space: " +
                       byte_to_human_read(free_bytes))
-        return False
+        return debug_report
 
     logging.debug("Reading directories: %s", str(directories))
+
+    debug_report["directories"] = str(directories)
 
     files = read_directories(ast.literal_eval(directories))
 
     files.sort(key=os.path.getmtime)
 
-    logging.debug("Collecting files from available set: %s", str(files))
+    debug_report["files"] = str(files)
+
+    logging.debug("Collecting files from available set: %s", debug_report["files"])
 
     free_space_needed = calc_demanded_space(
         free_bytes, human_read_to_byte(free), human_read_to_byte(threshold))
 
+    debug_report["free_space_needed"] = byte_to_human_read(free_space_needed)
+
     logging.debug("Space that needs to be freed: %s",
-                  byte_to_human_read(free_space_needed))
+                  debug_report["free_space_needed"])
 
     files_collected = collect_files_to_clean(files, free_space_needed)
+
+    debug_report["files_collected"] = str(files_collected)
 
     api.fire_api_move(files=files_collected, url=rclone_url, remote_path_mapping=ast.literal_eval(
         remote_path_mapping), remote_source=source_remote, remote_dest=dest_remote, username=auth_user, password=auth_password, dry_run=ast.literal_eval(dry_run))
 
+    return debug_report
 
 def byte_to_human_read(bytes, units=UNITS_MAPPING):
     """Get human-readable file sizes.

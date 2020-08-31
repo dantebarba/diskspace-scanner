@@ -1,10 +1,20 @@
-version: '3.4'
+version: "3.4"
+# Define common behavior
+x-disk-scanner:
+  &default-disk-scanner
+  build: 
+    context: .
+    args:
+      BUILD_VERSION: ${BUILD_VERSION}
+  # Other settings can also be shared
+  image: dantebarba/diskspacescanner:latest
 
+# Define one service by wanted tag
 services:
-  diskspacescanner:
-    image: dantebarba/diskspacescanner:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        BUILD_VERSION: ${BUILD_VERSION}
+  # Use the extension as is
+  diskscanner-latest:
+    *default-disk-scanner
+  # Override the image tag
+  diskscanner-tag:
+    << : *default-disk-scanner
+    image: dantebarba/diskspacescanner:${BUILD_VERSION}
